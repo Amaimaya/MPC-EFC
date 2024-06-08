@@ -1,0 +1,116 @@
+from Compiler import mpc_math, ml
+from Compiler.util import bit_compose, bit_decompose
+import math
+import operator
+
+PRIME = 18446744073709551557
+BIT_LENGTH = PRIME.bit_length()
+EDABIT_BIT_LENGTH = BIT_LENGTH
+HALF_PRIME = PRIME // 2
+
+def LTS(x, y):
+    b = (y + edabit0[0]- HALF_PRIME).reveal()
+    a = (edabit1[0] - x + HALF_PRIME).reveal()
+    T = a + b
+    w1 = LTBits(b, edabit0[1])
+    w2 = LTBits(a - 1, edabit1[1])
+    w3 = (T - HALF_PRIME) < (b - HALF_PRIME)
+    w5 = LTBits(T, adder_result[:-1])
+    w = w1 + w2 + w3 - w4 - w5
+    return w
+
+def EQS(x, y):
+    squared_difference = (x - y).square()
+    return LTZ(squared_difference)
+
+def LTZ(x):
+    #edabit1 = sint.get_edabit(EDABIT_BIT_LENGTH, True)
+    a = (edabit1[0] - x).reveal()
+    T = a + HALF_PRIME
+    w2 = LTBits(T - 1, edabit1[1])
+    w3 = T < 0
+    #adder_result_zero = BitAdderZero(edabit1[1])
+    w5 = LTBits(a, adder_result_zero[:-1])
+    w =  w2 + w3 - w4zero - w5
+    return w
+
+def BitAdderZero(r1_bits):  # Protocol 4.4 in [1], modified to handle an array of zeros. Only used for LTZ
+    # Calculate ds with r0_bits being zero
+    ds = [[r1_bits[i], cint(0)] for i in range(len(r1_bits))]
+    # PreOpL using the carry function
+    cs = floatingpoint.PreOpL(carry, ds)
+    # Calculate the sum bits
+    ss = [r1_bits[0]] + [r1_bits[i].bit_xor(cs[i - 1][1]) for i in range(1, len(r1_bits))] + [cs[-1][1]]
+    return ss
+
+def carry(b, a, superfluous_parameter):  # page 45 in [1]
+    return a[0].bit_and(b[0]), a[1] + a[0].bit_and(b[1])
+
+def BitAdder(r0_bits, r1_bits):  # Protocol 4.4 in [1]
+    ds = [[r0_bits[i].bit_xor(r1_bits[i]), r0_bits[i].bit_and(
+        r1_bits[i])] for i in range(EDABIT_BIT_LENGTH)]
+    cs = floatingpoint.PreOpL(carry, ds)
+    ss = [r0_bits[0].bit_xor(r1_bits[0])] + [(r0_bits[i].bit_xor(r1_bits[i]).bit_xor(
+        cs[i - 1][1])) for i in range(1, EDABIT_BIT_LENGTH)] + [cs[-1][1]]
+    return ss
+
+def LTBits(R, x):
+    R_bits = cint.bit_decompose(R, BIT_LENGTH)
+    y = [x[i].bit_xor(R_bits[i]) for i in range(BIT_LENGTH)]
+    z = floatingpoint.PreOpL(floatingpoint.or_op, y[::-1])[::-1] + [0]
+    w = [z[i] - z[i + 1] for i in range(BIT_LENGTH)]
+    return sum((1-R_bits[i]) & w[i] for i in range(BIT_LENGTH))
+
+number_of_runs = 1000
+
+edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
+adder_result = BitAdder(edabit0[1], edabit1[1])
+w4 = adder_result[-1]
+adder_result_zero = BitAdderZero(edabit1[1])
+w4zero = adder_result_zero[-1]
+
+start_timer(1)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    y = sint(0)
+    print_ln("%s", LTS(x, y).reveal())
+stop_timer(1)
+
+start_timer(2)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    print_ln("%s", LTZ(x).reveal())
+stop_timer(2)
+
+start_timer(3)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    y = sint(0)
+    print_ln("%s", EQS(x, y).reveal())
+stop_timer(3)
+
+start_timer(4)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    y = sint(0)
+    print_ln("%s", (x<y).reveal())
+stop_timer(4)
+
+start_timer(5)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    print_ln("%s", (x<0).reveal())
+stop_timer(5)
+
+start_timer(6)
+@for_range_opt(number_of_runs)
+def f(i):
+    x = sint(-2)
+    y = sint(0)
+    print_ln("%s", (x == y).reveal())
+stop_timer(6)
