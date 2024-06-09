@@ -10,26 +10,8 @@ from sklearn.utils.multiclass import type_of_target
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from Compiler import mpc_math, ml
-from Compiler.util import bit_compose, bit_decompose
-import math
-import operator
 
-E = 2.71828
-
-multi_plain = 10000
-multi = cint(multi_plain)
-divi = cfix(1/multi_plain)
-
-# -------------------------------- COMPARISOSNS --------------------------------
-
-def LTS(x, y):
-    return x <= y
-
-def LTZ(x):
-    return x <= 0
-
-def EQS(x, y):
-    return x == y
+n_threads = 200
 
 # -------------------------------- METRICS --------------------------------
 
@@ -60,15 +42,19 @@ def calculate_metrics(y_test, y_pred, positive_label=0, plain_test = True):
 
     return precision, recall
 
+
 # -------------------------------- UTILS --------------------------------
+
+E = 2.71828
+
+# Array operations
 
 def sum_of_equal_scalar(arr, value):
     count = Array(len(arr)+1, sint)
     count[0] = sint(0)
-
     @for_range_opt(len(arr))
     def _(i):
-        count[i+1] =  count[i] + (sint(EQS(arr[i], value)))
+        count[i+1] =  count[i] + (arr[i] == value)
     return count[len(arr)]
 
 def cantor(x, y):
@@ -80,16 +66,25 @@ def find_nth_largest_value_from_array(arr, n):
 
     @for_range_opt(len(arr))
     def _(i):
-        number_of_numbers_lower = Array(len(arr) + 1, sint)
+        number_of_numbers_lower = Array(len(arr)+1, sint)
         number_of_numbers_lower[0] = sint(-1) # offset 1 since it is always going to be equal for j=i
-
         @for_range_opt(len(arr))
         def _(j):
-            number_of_numbers_lower[j+1] = number_of_numbers_lower[j] + sint(LTS(arr[j],arr[i]))
+            number_of_numbers_lower[j+1] = number_of_numbers_lower[j] + (arr[j]<=arr[i]).if_else(1,0)
+        result[i+1] = (number_of_numbers_lower[len(arr)] == n).if_else(arr[i], result[i])
+    return result[len(arr)] #TODO check if logic here is correct
 
-        result[i+1] = (sint(EQS(number_of_numbers_lower[len(arr)], n))).if_else(arr[i], result[i])
+def min_along_axis(arr, axis):
+    # Min value for every column
+    if axis == 0:
+        min_values = [tree_reduce(lambda x, y: x.min(y), list(col)) for col in list(zip(*arr))]
+    # Min value for every row
+    elif axis == 1:
+        min_values = [tree_reduce(lambda x, y: x.min(y), row) for row in arr]
+    else:
+        raise ValueError("Invalid axis. Use 0 for columns or 1 for rows.")
 
-    return result[len(arr)]
+    return min_values
 
 def extract_columns(X_view, i, j):
     length = len(X_view)
@@ -104,15 +99,14 @@ def extract_columns(X_view, i, j):
 
     return column_i, column_j
 
+
 def dot_product_neg_matrix(x, y):
     dp = Array(len(x)+1, sint)
     dp[0] = sint(0)
     @for_range_opt(len(x))
     def _(i):
-        dp[i+1] = dp[i] +sint.dot_product(0 - x[i], y[i])
-    return dp[len(x)]
-
-
+        dp[i] = sint.dot_product(0 - x[i], y[i])
+    return sum(dp[i] for i in range(len(dp)))
 
 def inverse_covariance_matrix(A, iterations=4):
     n = len(A)
@@ -146,7 +140,17 @@ def inverse_covariance_matrix(A, iterations=4):
 
 # -------------------------------- EFC --------------------------------
 
+multi_plain = 10000
+multi = cint(multi_plain)
+divi = cfix(1/multi_plain)
+
+
 def site_freq(X_view, psdcounts, max_bin):
+
+    for i in range(len(X_view)):
+        for j in range(len(X_view[0])):
+            X_view[i][j] = X_view[i][j]*multi
+
     n_attr = len(X_view[1])
     sitefreq = Matrix(n_attr, max_bin, sint)
     X_view_trans = X_view.transpose()
@@ -177,12 +181,13 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
             def _(k):
                 found_duplicate = sint(0)
                 occurence = sint(1)
-                cantor_k = sint(cantor(x[k], y[k]))
+                cantor_k = cantor(x[k], y[k])
 
                 for l in range(arr_len):
+
                     cantors_are_equal = (cantor_k - cantor(x[l], y[l])).square()
-                    found_duplicate = (sint(LTZ(sint(cantors_are_equal + 1 - (l < k))))).if_else(1, found_duplicate)
-                    occurence += (sint(LTZ(sint(cantors_are_equal + 1 - (l > k)))))
+                    found_duplicate = ((cantors_are_equal + 1 - (l < k)) == 0).if_else(1, found_duplicate)
+                    occurence += ((cantors_are_equal + 1 - (l > k)) == 0)
 
                 occurence *= multi
                 found_duplicate *= multi
@@ -192,8 +197,7 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
                     ai_check = (ai*multi - X_view[k][i]).square()
                     @for_range_opt(max_bin)
                     def _(aj):
-                        pairfreq[i][ai][j][aj] = (sint(LTZ((found_duplicate) + ai_check + (aj*multi - X_view[k][j]).square()))).if_else(occurence, pairfreq[i][ai][j][aj])
-
+                        pairfreq[i][ai][j][aj] = (((found_duplicate) + ai_check + (aj*multi - X_view[k][j]).square()) == 0).if_else(occurence, pairfreq[i][ai][j][aj])
     adder = cint(int((psdcounts*multi_plain) /(max_bin ** 2)))
     multiplier = cfix((1-psdcounts) / n_inst)
 
@@ -219,6 +223,7 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
     return pairfreq
 
 def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
+
     print_ln("pairfreq_view coupling %s", pairfreq_view.reveal())
     print_ln("sitefreq_view coupling %s", sitefreq_view.reveal())
 
@@ -249,11 +254,10 @@ def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
 
                     corr_matrix[corr_row][corr_col] = (
                         pairfreq_view[i][ai][j][aj] - mpc_math.floor_fx(attr_i_bin_freq * sitefreq_view[j][aj] * divi))
-
     return inverse_covariance_matrix(corr_matrix)
 
 
-def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
+def local_fields(coupling_view, pairfreq_view, sitefreq_view, psdcounts, max_bin):
     n_inst = len(sitefreq_view)
     fields = Array(n_inst * (max_bin - 1), sint)
 
@@ -283,49 +287,49 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
     print_ln("local_fields energy: %s", local_fields.reveal())
 
     coupling_matrix_len = len(coupling_matrix)
-    local_fields_len = len(local_fields)
+    local_field_len = len(local_fields)
 
     @for_range_opt(n_inst)
     def _(i):
-        selector_fields = Array(local_fields_len, sint).assign_all(0)
-        selector_coupling = Matrix(coupling_matrix_len, coupling_matrix_len, sint).assign_all(0)
+        selector_fields = local_fields.same_shape().assign_all(0)
+        selector_coupling = coupling_matrix.same_shape().assign_all(0)
 
         @for_range_opt(n_attr)
         def _(j):
             j_value = X[i][j]
-            is_j_value = sint(EQS(j_value, max_bin-1))
-            coupling_idx_to_find1 = j * (max_bin - 1) + j_value
+            is_j_value = (j_value != (max_bin-1))
+            value_condition_1 = j * (max_bin - 1) + j_value
 
             @for_range_opt(j, n_attr)
             def _(k):
-                k_value = (is_j_value).if_else(max_bin - 1, X[i][k])
-                is_k_value = sint(EQS(k_value, max_bin-1))
-                coupling_idx_to_find2 = k * (max_bin - 1) + k_value
-
+                k_value = (is_j_value == 0).if_else(max_bin-1, X[i][k])
+                is_k_value = k_value != (max_bin-1)
+                value_condition_2 = k * (max_bin - 1) + k_value
+                condition_k_sq = (1-is_k_value).square()
                 @for_range_opt(coupling_matrix_len)
                 def _(l):
-                    coupling_is_eq_idx1 = (l-coupling_idx_to_find1).square()
-
+                    condition1sq = (l-value_condition_1).square()
                     @for_range_opt(coupling_matrix_len)
                     def _(m):
-                        coupling_is_eq_idx2 = (m-coupling_idx_to_find2).square()
-                        selector_coupling[l][m] = (sint(LTZ(coupling_is_eq_idx1 + coupling_is_eq_idx2 + is_k_value))).if_else(1,selector_coupling[l][m])
+                        selector_coupling[l][m] = ((condition1sq + (m-value_condition_2).square() + condition_k_sq) == 0).if_else(1,selector_coupling[l][m])
 
-            @for_range_opt(local_fields_len)
+            @for_range_opt(local_field_len)
             def _(k):
-                fields_is_eq_idx = (k - (j * (max_bin - 1) + j_value)).square()
-                selector_fields[k] = (sint(LTZ(fields_is_eq_idx + is_j_value))).if_else(1, selector_fields[k])
-
+                #condition1 = ((k == (j * (max_bin - 1) + j_value))).if_else(1,0)
+                condition1 = (k-(j * (max_bin - 1) + j_value)).square()
+                selector_fields[k] = (condition1 + 1-is_j_value ==0).if_else(1, selector_fields[k])
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sint.dot_product(local_fields, selector_fields))
 
     print_ln("Energies: %s", energies.reveal())
+
     return energies
+
 
 def fit(X, pseudocounts, max_bin):
     sitefreq = site_freq(X, pseudocounts, max_bin)
     pairfreq = pair_freq(X,sitefreq, pseudocounts, max_bin)
     coupling_matrix = coupling(pairfreq, sitefreq, pseudocounts, max_bin)
-    localfields = local_fields(coupling_matrix, sitefreq, pseudocounts, max_bin)
+    localfields = local_fields(coupling_matrix, pairfreq, sitefreq, pseudocounts, max_bin)
     cutoff = define_cutoff(X, 0.95, coupling_matrix, localfields, max_bin)
 
     return coupling_matrix, localfields, cutoff
@@ -339,7 +343,7 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
     n_inst = len(X)
     y_pred = Array(n_inst, cint)
 
-    min_energies = [tree_reduce(lambda x, y: x.min(y), list(col)) for col in list(zip(*energies))]
+    min_energies = min_along_axis(energies, 0)
 
     def predict_row(row):
         return (min_energies[row] >= cutoff).reveal()
@@ -350,7 +354,6 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
             y_pred[row] = result
 
     return y_pred
-
 
 # -------------------------------- TEST --------------------------------
 
@@ -420,11 +423,12 @@ def test_inference_phase():
     #precision, recall = calculate_metrics(y_test, y_pred_presaved)
 
 #----------------------------------- MAIN -----------------------------------
-number_of_runs = 1
-
-
-test_training_phase()
 start_timer(1)
-
-test_inference_phase()
+test_training_phase()
 stop_timer(1)
+
+start_timer(2)
+test_inference_phase()
+stop_timer(2)
+
+

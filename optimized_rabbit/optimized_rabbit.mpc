@@ -29,17 +29,13 @@ HALF_PRIME = PRIME // 2
 
 # -------------------------------- RABBIT --------------------------------
 
-
 def LTS(x, y):
-    edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
     b = (y + edabit0[0]- HALF_PRIME).reveal()
     a = (edabit1[0] - x + HALF_PRIME).reveal()
     T = a + b
     w1 = LTBits(b, edabit0[1])
     w2 = LTBits(a - 1, edabit1[1])
     w3 = (T - HALF_PRIME) < (b - HALF_PRIME)
-    adder_result = BitAdder(edabit0[1], edabit1[1])
-    w4 = adder_result[-1]
     w5 = LTBits(T, adder_result[:-1])
     w = w1 + w2 + w3 - w4 - w5
     return w
@@ -49,15 +45,14 @@ def EQS(x, y):
     return LTZ(squared_difference)
 
 def LTZ(x):
-    edabit1 = sint.get_edabit(EDABIT_BIT_LENGTH, True)
+    #edabit1 = sint.get_edabit(EDABIT_BIT_LENGTH, True)
     a = (edabit1[0] - x).reveal()
     T = a + HALF_PRIME
     w2 = LTBits(T - 1, edabit1[1])
     w3 = T < 0
-    adder_result = BitAdderZero(edabit1[1])
-    w4 = adder_result[-1]
-    w5 = LTBits(a, adder_result[:-1])
-    w =  w2 + w3 - w4 - w5
+    #adder_result_zero = BitAdderZero(edabit1[1])
+    w5 = LTBits(a, adder_result_zero[:-1])
+    w =  w2 + w3 - w4zero - w5
     return w
 
 def BitAdderZero(r1_bits):  # Protocol 4.4 in [1], modified to handle an array of zeros. Only used for LTZ
@@ -86,6 +81,9 @@ def LTBits(R, x):
     z = floatingpoint.PreOpL(floatingpoint.or_op, y[::-1])[::-1] + [0]
     w = [z[i] - z[i + 1] for i in range(BIT_LENGTH)]
     return sum((1-R_bits[i]) & w[i] for i in range(BIT_LENGTH))
+
+def preprocessing(ROUNDS, BIT_LENGTH):
+    return [create_n_ary_random(BIT_LENGTH, ARITY), create_n_ary_random(BIT_LENGTH, 1, "LSB"), prefix_product_prep(BIT_LENGTH_DIVIDED)]
 
 # -------------------------------- METRICS --------------------------------
 
@@ -306,6 +304,7 @@ def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
                 @for_range_opt(max_bin-1)
                 def _(aj):
                     corr_col = col_offset[j+1] + aj
+                    print_ln("%s", (sitefreq_view[i][ai] * sitefreq_view[j][aj]).reveal())
 
                     corr_matrix[corr_row][corr_col] = (
                         pairfreq_view[i][ai][j][aj] - mpc_math.floor_fx(attr_i_bin_freq * sitefreq_view[j][aj] * divi))
@@ -430,7 +429,7 @@ def test_training_phase():
 
     # Save the classifier info to file
     cutoff_arr = Array(1, sint)
-    cutoff_arr[0] = cutoff
+    cutoff_arr[0] = mu
     cutoff_arr.write_to_file(position = 0)
     coupling_matrix.write_to_file(position = 1)
     localfields.write_to_file(position = (1+(len(coupling_matrix)*len(coupling_matrix[0]))))
@@ -481,9 +480,19 @@ def test_inference_phase():
 #----------------------------------- MAIN -----------------------------------
 number_of_runs = 1
 
+#program.use_edabit(True)
 
-test_training_phase()
+edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
+adder_result = BitAdder(edabit0[1], edabit1[1])
+w4 = adder_result[-1]
+adder_result_zero = BitAdderZero(edabit1[1])
+w4zero = adder_result_zero[-1]
+
 start_timer(1)
-
-test_inference_phase()
+test_training_phase()
 stop_timer(1)
+
+start_timer(2)
+test_inference_phase()
+stop_timer(2)
+

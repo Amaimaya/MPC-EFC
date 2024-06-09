@@ -187,7 +187,6 @@ def site_freq(X_view, psdcounts, max_bin):
     return sitefreq
 
 def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
-
     n_inst, n_attr = len(X_view), len(X_view[1])
     pairfreq = zeros_4d(n_attr, max_bin, n_attr, max_bin)
 
@@ -222,8 +221,6 @@ def coupling(pairfreq_view, sitefreq_view, max_bin):
         for j in range(n_attr):
             for ai in range(max_bin - 1):
                 for aj in range(max_bin - 1):
-                    print((
-                            pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj]))
                     corr_matrix[i * (max_bin - 1) + ai][j * (max_bin - 1) + aj] = (
                             pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj])
 
