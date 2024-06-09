@@ -10,8 +10,6 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 
 from Compiler import mpc_math, ml
 
-E = 2.71828
-
 # -------------------------------- METRICS --------------------------------
 
 def calculate_metrics(y_test, y_pred, positive_label=0, plain_test = True):
@@ -44,6 +42,9 @@ def calculate_metrics(y_test, y_pred, positive_label=0, plain_test = True):
 
 # -------------------------------- UTILS --------------------------------
 
+E = 2.71828
+
+
 def exponential_matrix(matrix):
     e = cfix(E)
     matrix_exponentiated = matrix.same_shape()
@@ -70,6 +71,36 @@ def log_2d(matrix):
         def _(j):
             log_2d_matrix[i][j] = mpc_math.log_fx(matrix[i][j], E)
     return log_2d_matrix
+
+# Arrays creation
+
+def zeros_by_array(array):
+    return array.same_shape().assign_all(0.0)
+
+def zeros_1d_by_shape(length):
+    array = Array(length, sfix)
+    return array.assign_all(0.0)
+
+def zeros_2d_by_shape(rows, columns):
+    matrix = Matrix(rows, columns, sfix)
+    return matrix.assign_all(0.0)
+
+def zeros_3d_by_shape(a,b,c):
+    matrix = MultiArray([a,b,c], sfix)
+    return matrix.assign_all(0.0)
+
+def zeros_4d_by_shape(a,b,c,d):
+    matrix = MultiArray([a,b,c,d], sfix)
+    return matrix.assign_all(0.0)
+
+# Array operations
+
+def subtract_from_1d_array(arr, value):
+    result = arr.same_shape()
+    @for_range_opt(len(arr))
+    def _(i):
+        result[i] = result[i] - value
+    return result
 
 def add_scalar_to_2d_matrix(matrix, scalar):
     result_matrix = matrix.same_shape()
@@ -139,6 +170,13 @@ def sum_of_equal_scalar(arr, value):
         count[i+1] =  count[i] + (arr[i] == value).if_else(1, 0)
     return count[len(arr)]
 
+def negative_array(array):
+    negative = array.same_shape()
+    @for_range_opt(len(arr))
+    def _(i):
+        negative[i] = array[i] * -1
+    return negative
+
 def negative_matrix(matrix):
     negative = matrix.same_shape()
     @for_range_opt(len(matrix))
@@ -148,33 +186,30 @@ def negative_matrix(matrix):
             negative[i][j] = matrix[i][j] * -1
     return negative
 
+def compute_max_from_array(arr):
+    length = arr.length
+    max_value = Array(length+1, sfix)
+    max_value[0] = sfix(-16383)
+    @for_range_opt(length)
+    def _(j):
+        max_value[j+1] = (max_value[j]>arr[j]).if_else(max_value[j], arr[j])
+    return max_value[length]
+
+def compute_max_from_matrix(matrix):
+    max_value = Array(len(matrix)*len(matrix[0])+1, sfix)
+    max_value[0] = sfix(-16383)
+    @for_range_opt(len(matrix))
+    def _(i):
+        @for_range_opt(len(matrix[0]))
+        def _(j):
+            max_value[i*len(matrix) + j+1] = (max_value[i*len(matrix)+j]>matrix[i][j]).if_else(max_value[i*len(matrix)+j], matrix[i][j])
+    return max_value[len(matrix)*len(matrix[0])]
+
+
+
+
 def cantor(x, y):
-    output = Array(len(x), sfix)
-    for i in range(len(x)):
-        output[i] = (x[i] + y[i]) * (x[i] + y[i] + 1) / 2 + y[i]
-    return output
-
-def unique_list(arr, duplicate_placeholder = -1):
-    unique_values = arr.same_shape()
-    found_duplicate = Array(len(arr), sint)
-    indices = Array(len(arr), sint)
-
-    for i in range(len(arr)):
-        for j in range(i):
-            found_duplicate[i] = (arr[i] == arr[j]).if_else(1, found_duplicate[i]) #TODO: maybe break loop if found_duplicate is true
-
-        unique_values[i] = (found_duplicate[i] == 1).if_else(duplicate_placeholder, arr[i])
-        indices[i] = (found_duplicate[i] == 1).if_else(duplicate_placeholder, i)
-
-    unique_values.sort()
-    found_duplicate_sum = sum(found_duplicate).reveal()
-    length_to_crop = len(unique_values) - found_duplicate_sum
-    unique_values_cropped = unique_values.get_part(found_duplicate_sum, length_to_crop) #TODO: is it fine to reveal here? needs to be CINT....
-
-    indices.sort()
-    indices_cropped = indices.get_part(found_duplicate_sum, length_to_crop)
-
-    return unique_values_cropped, indices_cropped
+    return (x + y) * (x + y + 1) * cfix(0.5) + y
 
 
 def extract_columns(X_view, i, j):
@@ -197,11 +232,14 @@ def dot_product_matrix(x, y):
         dp[i+1] = dp[i] + sfix.dot_product(x[i], y[i])
     return dp[len(x)]
 
+def dot_product(x, y):
+    return sfix.dot_product(x,y)
+
 # -------------------------------- EFC --------------------------------
 
 def site_freq(X_view, psdcounts, max_bin):
     n_attr = len(X_view[1]) # total feature
-    sitefreq = Matrix(n_attr, max_bin, sfix).assign_all(0.0)
+    sitefreq = zeros_2d_by_shape(n_attr, max_bin)
     X_view_trans = X_view.transpose()
 
     @for_range(n_attr)
@@ -213,47 +251,58 @@ def site_freq(X_view, psdcounts, max_bin):
     sitefreq = divide_2d_matrix_by_scalar(sitefreq, len(X_view))
     sitefreq = multiply_2d_matrix_by_scalar(sitefreq, 1-psdcounts)
     addition = psdcounts / max_bin
-    print_ln("Site freq: %s", add_scalar_to_2d_matrix(sitefreq, addition).reveal())
     return add_scalar_to_2d_matrix(sitefreq, addition)
 
 def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
     n_inst, n_attr = len(X_view), len(X_view[1])
-    pairfreq = MultiArray([n_attr, max_bin, n_attr, max_bin], sfix).assign_all(0.0)
+    pairfreq = zeros_4d_by_shape(n_attr, max_bin, n_attr, max_bin)
 
-    for i in range(n_attr):
-        for j in range(n_attr):
-            column_i, column_j = extract_columns(X_view, i, j)
-            c = cantor(column_i, column_j)
-            unique, aaIdx = unique_list(c)
+    @for_range_opt(n_attr)
+    def _(i):
+        @for_range_opt(n_attr)
+        def _(j):
+            x, y = extract_columns(X_view, i, j)
+            arr_len = x.length
 
-            @for_range(unique.length)
-            def _(x):
-                item = unique[x]
-                comparison_results = equal_scalar(c, item)
+            @for_range_opt(arr_len)
+            def _(k):
+                found_duplicate = sint(0)
+                occurence = sint(1)
+                cantor_k = cantor(x[k], y[k])
 
-                sum_result = 0
+                for l in range(arr_len):
+                    cantors_are_equal = cantor_k == cantor(x[l], y[l])
+                    found_duplicate = ((cantors_are_equal + (l < k)) == 2).if_else(1, found_duplicate)
+                    occurence += ((cantors_are_equal + (l > k)) == 2).if_else(1, 0)
 
-                for result in comparison_results:
-                    sum_result += result
+                @for_range_opt(max_bin)
+                def _(ai):
+                    @for_range_opt(max_bin)
+                    def _(aj):
+                        pairfreq[i][ai][j][aj] = (((found_duplicate == 0) + (ai == X_view[k][i]) + (aj == X_view[k][j])) == 3).if_else(occurence, pairfreq[i][ai][j][aj])
 
-                pairfreq[i][X_view[aaIdx[x].reveal()][i].reveal()][j][X_view[aaIdx[x].reveal()][j].reveal()] = sum_result
 
     pairfreq = divide_4d_matrix_by_scalar(pairfreq, n_inst)
     pairfreq = multiply_4d_matrix_by_scalar(pairfreq, 1-psdcounts)
     pairfreq += (psdcounts / (max_bin ** 2))
 
-    for i in range(n_attr):
-        @for_range(max_bin)
-        def _(x):
-            @for_range(max_bin)
-            def _(y):
-                pairfreq[i][x][i][y] = (x == y).if_else(sitefreq_view[i][x], 0.0)
+
+    @for_range_opt(n_attr)
+    def _(i):
+        @for_range_opt(max_bin)
+        def _(j):
+            @for_range_opt(n_attr)
+            def _(k):
+                @for_range_opt(max_bin)
+                def _(l):
+                    pairfreq[i][j][k][l] = (((j == l) + (i == k)) == 2).if_else(sitefreq_view[i][j], pairfreq[i][j][k][l])
+                    pairfreq[i][j][k][l] = (((j != l) + (i == k)) == 2).if_else(0.0, pairfreq[i][j][k][l])
 
     return pairfreq
 
-def coupling(pairfreq_view, sitefreq_view, max_bin):
+def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
     n_attr = len(sitefreq_view)
-    corr_matrix = Matrix(n_attr * (max_bin - 1), n_attr * (max_bin - 1), sfix).assign_all(0.0)
+    corr_matrix = zeros_2d_by_shape(n_attr * (max_bin - 1), n_attr * (max_bin - 1))
 
     @for_range_opt(n_attr)
     def _(i):
@@ -263,11 +312,8 @@ def coupling(pairfreq_view, sitefreq_view, max_bin):
             def _(ai):
                 @for_range_opt(max_bin-1)
                 def _(aj):
-                    print_ln("%s", (
-                            pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj]).reveal())
                     corr_matrix[i * (max_bin - 1) + ai][j * (max_bin - 1) + aj] = (
                             pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj])
-
     print_ln("Corr_matrix %s", corr_matrix.reveal())
     inv_corr = ml.mr(corr_matrix, 10)
     neg_matrix = negative_matrix(inv_corr)
@@ -275,7 +321,7 @@ def coupling(pairfreq_view, sitefreq_view, max_bin):
 
     return exp_matrix
 
-def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
+def local_fields(coupling_view, pairfreq_view, sitefreq_view, psdcounts, max_bin):
     n_inst = len(sitefreq_view)
     fields = Array(n_inst * (max_bin - 1), sfix)
 
@@ -295,15 +341,16 @@ def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
 
 def compute_energy(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
-    energies = Array(n_inst, sfix).assign_all(0.0)
+    energies = zeros_1d_by_shape(n_inst)
 
     print_ln("coupling_matrix: %s", coupling_matrix.reveal())
     print_ln("local_fields: %s", local_fields.reveal())
 
+
     @for_range_opt(n_inst)
     def _(i):
-        matrix_selector1 = Array(len(local_fields), sfix).assign_all(0.0)
-        matrix_selector2 = Matrix(len(coupling_matrix), len(coupling_matrix[0]), sfix).assign_all(0.0)
+        matrix_selector1 = zeros_1d_by_shape(len(local_fields))
+        matrix_selector2 = zeros_2d_by_shape(len(coupling_matrix), len(coupling_matrix[0]))
 
         @for_range_opt(n_attr)
         def _(j):
@@ -331,7 +378,7 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
                 matrix_selector1[k] = (condition1 + condition2==2).if_else(1, matrix_selector1[k])
 
         energies[i] -= dot_product_matrix(coupling_matrix, matrix_selector2)
-        energies[i] -= sfix.dot_product(local_fields, matrix_selector1)
+        energies[i] -= dot_product(local_fields, matrix_selector1)
 
     print_ln("energies: %s", energies.reveal())
     return energies
@@ -339,10 +386,9 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
 def fit(X, pseudocounts, max_bin):
     sitefreq = site_freq(X, pseudocounts, max_bin)
     pairfreq = pair_freq(X,sitefreq, pseudocounts, max_bin)
-    coupling_matrix = coupling(pairfreq, sitefreq, max_bin)
-    localfields = local_fields(coupling_matrix, sitefreq, pseudocounts, max_bin)
+    coupling_matrix = coupling(pairfreq, sitefreq, pseudocounts, max_bin)
+    localfields = local_fields(coupling_matrix, pairfreq, sitefreq, pseudocounts, max_bin)
     coupling_matrix = log_2d(coupling_matrix)
-    print_ln("COUPLING MATRIX BASE: %s", coupling_matrix.reveal())
     localfields = log_1d(localfields)
 
     cutoff = define_cutoff(X, 0.95, coupling_matrix, localfields, max_bin)
@@ -371,6 +417,7 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
             y_pred[row] = result.reveal()
 
         return y_pred
+
 
 
 # -------------------------------- TEST --------------------------------
@@ -432,7 +479,6 @@ def test_inference_phase():
     precision, recall = calculate_metrics(y_test, y_pred_presaved)
 
 #----------------------------------- MAIN -----------------------------------
-
 start_timer(1)
 test_training_phase()
 stop_timer(1)
