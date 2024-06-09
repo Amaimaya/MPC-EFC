@@ -2,7 +2,7 @@
 
 ## Setup
 1. Download the SPDZ distribution (https://github.com/data61/MP-SPDZ/releases) and unpack it
-2. In /Programs/Source clone our git repo (https://github.com/Amaimaya/EFC-MP-SPDZ)
+2. In /Programs/Source clone our git repo (https://github.com/Amaimaya/MPC-EFC)
 3. Navigate to the root folder of the repo (~/mp-spdz-0.3.8/Programs/Source/EFC-MP-SPDZ) 
 4. Run the **./run.sh** script that does the following:
    1. Pull from git
