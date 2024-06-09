@@ -167,7 +167,7 @@ def dot_product_neg_matrix(x, y):
 
     return sum(dp[i] for i in range(len(dp)))
 
-def inverse_covariance_matrix(A, iterations=4):
+def inverse_covariance_matrix(A, iterations=12):
     n = len(A)
     trace_A = sum(A[i][i] for i in range(len(A)))
     c_inv = sint(1) / trace_A
@@ -251,7 +251,7 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
                     @for_range_opt(max_bin)
                     def _(aj):
                         pairfreq[i][ai][j][aj] = (sint(LTZ((found_duplicate) + ai_check + (aj*multi - X_view[k][j]).square()))).if_else(occurence, pairfreq[i][ai][j][aj])
-    
+
     adder = cint(int((psdcounts*multi_plain) /(max_bin ** 2)))
     multiplier = cfix((1-psdcounts) / n_inst)
 
@@ -308,7 +308,7 @@ def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
 
                     corr_matrix[corr_row][corr_col] = (
                         pairfreq_view[i][ai][j][aj] - mpc_math.floor_fx(attr_i_bin_freq * sitefreq_view[j][aj] * divi))
-                        
+
     return inverse_covariance_matrix(corr_matrix)
 
 
@@ -328,8 +328,10 @@ def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
             def _(j):
                 @for_range_opt(max_bin - 1)
                 def _(aj):
-                    acc[1+ (j*(max_bin-1)) + aj] = acc[(j*(max_bin-1)) + aj] * (-coupling_view[idx][j * (max_bin - 1) + aj] * sitefreq_view[j][aj]) # Improvement: We don't need the exponential coupling_view, so no log of coupling or local_fields later
-            fields[idx] = mpc_math.floor_fx(mpc_math.log_fx(log_value, E) - acc[n_inst*(max_bin - 1)] * divi)
+                    coupling_smaller = coupling_view[idx][j * (max_bin - 1) + aj]*divi
+                    sitefreq_smaller = sitefreq_view[j][aj] * divi
+                    acc[1+ (j*(max_bin-1)) + aj] = acc[(j*(max_bin-1)) + aj] * (-coupling_smaller * sitefreq_smaller) # Improvement: We don't need the exponential coupling_view, so no log of coupling or local_fields later
+            fields[idx] = mpc_math.floor_fx((mpc_math.log_fx(log_value, E) - acc[n_inst*(max_bin - 1)])*multi)
 
     return fields
 
@@ -360,7 +362,7 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
                 k_value = (is_j_value).if_else(max_bin - 1, X[i][k])
                 is_k_value = sint(EQS(k_value, max_bin-1))
                 coupling_idx_to_find2 = k * (max_bin - 1) + k_value
-                
+
                 @for_range_opt(coupling_matrix_len)
                 def _(l):
                     coupling_is_eq_idx1 = (l-coupling_idx_to_find1).square()
@@ -429,7 +431,7 @@ def test_training_phase():
 
     # Save the classifier info to file
     cutoff_arr = Array(1, sint)
-    cutoff_arr[0] = cutoff
+    cutoff_arr[0] = mu
     cutoff_arr.write_to_file(position = 0)
     coupling_matrix.write_to_file(position = 1)
     localfields.write_to_file(position = (1+(len(coupling_matrix)*len(coupling_matrix[0]))))
