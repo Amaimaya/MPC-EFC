@@ -3,15 +3,12 @@ import sys
 import math
 import warnings
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
 
 from sklearn.model_selection import train_test_split
 from sklearn.utils.multiclass import type_of_target
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from Compiler import mpc_math, ml
-
-n_threads = 200
 
 # -------------------------------- METRICS --------------------------------
 
@@ -61,9 +58,8 @@ def cantor(x, y):
     return (x + y) * (x + y + 1) * cfix(0.5) + y
 
 def find_nth_largest_value_from_array(arr, n):
-    result = Array(len(arr)+1, sint)
-    result[0] = sint(0)
-
+    result = Array(len(arr)+1, sfix)
+    result[0] = sfix(0.0)
     @for_range_opt(len(arr))
     def _(i):
         number_of_numbers_lower = Array(len(arr)+1, sint)
@@ -72,7 +68,7 @@ def find_nth_largest_value_from_array(arr, n):
         def _(j):
             number_of_numbers_lower[j+1] = number_of_numbers_lower[j] + (arr[j]<=arr[i]).if_else(1,0)
         result[i+1] = (number_of_numbers_lower[len(arr)] == n).if_else(arr[i], result[i])
-    return result[len(arr)] #TODO check if logic here is correct
+    return result[len(arr)]
 
 def min_along_axis(arr, axis):
     # Min value for every column
@@ -88,29 +84,28 @@ def min_along_axis(arr, axis):
 
 def extract_columns(X_view, i, j):
     length = len(X_view)
-    column_i = Array(length, sint)
-    column_j = Array(length, sint)
+    column_i = Array(length, sfix)
+    column_j = Array(length, sfix)
 
     @for_range_opt(length)
-
     def _(index):
         column_i[index] = X_view[index][i]
         column_j[index] = X_view[index][j]
 
     return column_i, column_j
 
-
 def dot_product_neg_matrix(x, y):
-    dp = Array(len(x)+1, sint)
-    dp[0] = sint(0)
+    dp = Array(len(x)+1, sfix)
+    dp[0] = sfix(0)
     @for_range_opt(len(x))
     def _(i):
-        dp[i] = sint.dot_product(0 - x[i], y[i])
+        dp[i] = sfix.dot_product(0 - x[i], y[i])
     return sum(dp[i] for i in range(len(dp)))
 
-def inverse_covariance_matrix(A, iterations=4):
+def inverse_covariance_matrix(A, iterations=10):
     n = len(A)
     trace_A = sum(A[i][i] for i in range(len(A)))
+
     c_inv = sint(1) / trace_A
     for _ in range(iterations):
         c_inv *= cint(2) - trace_A * c_inv
@@ -127,48 +122,37 @@ def inverse_covariance_matrix(A, iterations=4):
     for _ in range(iterations):
         AX = A * X
 
-        @for_range_opt(n)
+        @for_range_opt( n)
         def _(i):
-            two_I_minus_AX[i] = (two_I[i] - AX[i])
+            two_I_minus_AX[i] = two_I[i] - AX[i]
 
         X = X * two_I_minus_AX
-    res = Matrix(n, n, sint)
-    for i in range(len(X)):
-        for j in range(len(X)):
-            res[i][j] = mpc_math.floor_fx(X[i][j] *multi *multi)
-    return res
+
+    return X
+
+
 
 # -------------------------------- EFC --------------------------------
 
-multi_plain = 10000
-multi = cint(multi_plain)
-divi = cfix(1/multi_plain)
-
-
 def site_freq(X_view, psdcounts, max_bin):
-
-    for i in range(len(X_view)):
-        for j in range(len(X_view[0])):
-            X_view[i][j] = X_view[i][j]*multi
-
     n_attr = len(X_view[1])
-    sitefreq = Matrix(n_attr, max_bin, sint)
+    sitefreq = Matrix(n_attr, max_bin, sfix)
     X_view_trans = X_view.transpose()
-    normalization_factor = int(((1-psdcounts)*multi_plain)/len(X_view))
-    baseline_increment = int((psdcounts * multi_plain) / max_bin)
+    normalization_factor = (1-psdcounts)/len(X_view)
+    baseline_increment = psdcounts / max_bin
 
     @for_range_opt(n_attr)
     def _(i):
         @for_range_opt(max_bin)
         def _(j):
-            sitefreq[i][j] = sum_of_equal_scalar(X_view_trans[i], j*multi)
+            sitefreq[i][j] = sum_of_equal_scalar(X_view_trans[i], j)
             sitefreq[i][j] = sitefreq[i][j] * normalization_factor + baseline_increment
 
     return sitefreq
 
 def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
     n_inst, n_attr = len(X_view), len(X_view[1])
-    pairfreq = MultiArray([n_attr,max_bin,n_attr,max_bin], sint)
+    pairfreq = MultiArray([n_attr,max_bin,n_attr,max_bin], sfix)
 
     @for_range_opt(n_attr)
     def _(i):
@@ -184,25 +168,24 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
                 cantor_k = cantor(x[k], y[k])
 
                 for l in range(arr_len):
-
                     cantors_are_equal = (cantor_k - cantor(x[l], y[l])).square()
                     found_duplicate = ((cantors_are_equal + 1 - (l < k)) == 0).if_else(1, found_duplicate)
                     occurence += ((cantors_are_equal + 1 - (l > k)) == 0)
 
-                occurence *= multi
-                found_duplicate *= multi
+                multiplier = (1-psdcounts)/n_inst
 
                 @for_range_opt(max_bin)
                 def _(ai):
-                    ai_check = (ai*multi - X_view[k][i]).square()
+                    ai_check = (ai - X_view[k][i]).square()
                     @for_range_opt(max_bin)
                     def _(aj):
-                        pairfreq[i][ai][j][aj] = (((found_duplicate) + ai_check + (aj*multi - X_view[k][j]).square()) == 0).if_else(occurence, pairfreq[i][ai][j][aj])
-    adder = cint(int((psdcounts*multi_plain) /(max_bin ** 2)))
-    multiplier = cfix((1-psdcounts) / n_inst)
+                        pairfreq[i][ai][j][aj] = (((found_duplicate) + ai_check + (aj - X_view[k][j]).square()) == 0).if_else(occurence, pairfreq[i][ai][j][aj])
 
-# Improvement: in second block of for_range, we dont need to iterate through K:
-# In the if_else statements we had before, we would only change value if i == k
+    multiplier = (1-psdcounts)/n_inst
+    adder = (psdcounts / (max_bin ** 2))
+
+    # Improvement: in second block of for_range, we dont need to iterate through K:
+    # In the if_else statements we had before, we would only change value if i == k
     @for_range_opt(n_attr)
     def _(i):
         @for_range_opt(max_bin)
@@ -222,68 +205,44 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
 
     return pairfreq
 
-def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
-
-    print_ln("pairfreq_view coupling %s", pairfreq_view.reveal())
-    print_ln("sitefreq_view coupling %s", sitefreq_view.reveal())
-
+def coupling(pairfreq_view, sitefreq_view, max_bin):
     n_attr = len(sitefreq_view)
-    corr_matrix = Matrix(n_attr * (max_bin - 1),  n_attr * (max_bin - 1), sint)
-
-    row_offset = Array(n_attr+1, cint)
-    row_offset[0] = -(max_bin - 1)
+    corr_matrix = Matrix(n_attr * (max_bin - 1),  n_attr * (max_bin - 1), sfix)
 
     @for_range_opt(n_attr)
     def _(i):
-        row_offset[i+1] = row_offset[i] + (max_bin - 1)
-        col_offset = Array(n_attr + 1, cint)
-        col_offset[0] = -(max_bin - 1)
-
         @for_range_opt(n_attr)
         def _(j):
-            col_offset[j+1] = col_offset[j] + (max_bin - 1)
-
             @for_range_opt(max_bin-1)
             def _(ai):
-                corr_row = row_offset[i+1] + ai
-                attr_i_bin_freq = sitefreq_view[i][ai]
-
                 @for_range_opt(max_bin-1)
                 def _(aj):
-                    corr_col = col_offset[j+1] + aj
-
-                    corr_matrix[corr_row][corr_col] = (
-                        pairfreq_view[i][ai][j][aj] - mpc_math.floor_fx(attr_i_bin_freq * sitefreq_view[j][aj] * divi))
+                    corr_matrix[i * (max_bin - 1) + ai][j * (max_bin - 1) + aj] = pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj]
     return inverse_covariance_matrix(corr_matrix)
 
-
-def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
+def local_fields(coupling_view, pairfreq_view, sitefreq_view, psdcounts, max_bin):
     n_inst = len(sitefreq_view)
-    fields = Array(n_inst * (max_bin - 1), sint)
-
+    fields = Array(n_inst * (max_bin - 1), sfix)
     @for_range_opt(n_inst)
     def _(i):
         @for_range_opt(max_bin - 1)
         def _(ai):
             idx = i * (max_bin - 1) + ai
-            log_value = sitefreq_view[i][ai] / (sitefreq_view[i][max_bin - 1])
+            fields[idx] = sitefreq_view[i][ai] / sitefreq_view[i][max_bin - 1]
             acc = Array((n_inst*(max_bin - 1))+1, sfix)
-            acc[0] = 1
+            acc[0] = 0
             @for_range_opt(n_inst)
             def _(j):
                 @for_range_opt(max_bin - 1)
                 def _(aj):
-                    coupling_smaller = coupling_view[idx][j * (max_bin - 1) + aj]*divi
-                    sitefreq_smaller = sitefreq_view[j][aj] * divi
-                    acc[1+ (j*(max_bin-1)) + aj] = acc[(j*(max_bin-1)) + aj] * (-coupling_smaller * sitefreq_smaller) # Improvement: We don't need the exponential coupling_view, so no log of coupling or local_fields later
-            fields[idx] = mpc_math.floor_fx((mpc_math.log_fx(log_value, E) - acc[n_inst*(max_bin - 1)])*multi)
-
+                    acc[1+ (j*(max_bin-1)) + aj] = acc[(j*(max_bin-1)) + aj] + (-coupling_view[idx][j * (max_bin - 1) + aj] * sitefreq_view[j][aj])
+            fields[idx] = mpc_math.log_fx(fields[idx], E) - acc[n_inst*(max_bin - 1)]
     return fields
 
 
 def compute_energy(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
-    energies = Array(n_inst, sint)
+    energies = Array(n_inst, sfix)
 
     print_ln("coupling_matrix energy: %s", coupling_matrix.reveal())
     print_ln("local_fields energy: %s", local_fields.reveal())
@@ -293,8 +252,8 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
 
     @for_range_opt(n_inst)
     def _(i):
-        selector_fields = local_fields.same_shape().assign_all(0)
-        selector_coupling = coupling_matrix.same_shape().assign_all(0)
+        selector_fields = local_fields.same_shape().assign_all(0.0)
+        selector_coupling = coupling_matrix.same_shape().assign_all(0.0)
 
         @for_range_opt(n_attr)
         def _(j):
@@ -304,23 +263,22 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
 
             @for_range_opt(j, n_attr)
             def _(k):
-                k_value = (is_j_value == 0).if_else(max_bin-1, X[i][k])
+                k_value = (1 - is_j_value).if_else(max_bin-1, X[i][k])
                 is_k_value = k_value != (max_bin-1)
                 value_condition_2 = k * (max_bin - 1) + k_value
-                condition_k_sq = (1-is_k_value).square()
+
                 @for_range_opt(coupling_matrix_len)
                 def _(l):
-                    condition1sq = (l-value_condition_1).square()
                     @for_range_opt(coupling_matrix_len)
                     def _(m):
-                        selector_coupling[l][m] = ((condition1sq + (m-value_condition_2).square() + condition_k_sq) == 0).if_else(1,selector_coupling[l][m])
+                        selector_coupling[l][m] = (((l-value_condition_1).square() + (m-value_condition_2).square() + (1-is_k_value).square()) == 0).if_else(1,selector_coupling[l][m])
 
             @for_range_opt(local_field_len)
             def _(k):
-                #condition1 = ((k == (j * (max_bin - 1) + j_value))).if_else(1,0)
-                condition1 = (k-(j * (max_bin - 1) + j_value)).square()
-                selector_fields[k] = (condition1 + 1-is_j_value ==0).if_else(1, selector_fields[k])
-        energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sint.dot_product(local_fields, selector_fields))
+                condition1 = ((k == (j * (max_bin - 1) + j_value))).if_else(1,0)
+                selector_fields[k] = (condition1 + is_j_value==2).if_else(1, selector_fields[k])
+
+        energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sfix.dot_product(local_fields, selector_fields))
 
     print_ln("Energies: %s", energies.reveal())
 
@@ -330,7 +288,7 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
 def fit(X, pseudocounts, max_bin):
     sitefreq = site_freq(X, pseudocounts, max_bin)
     pairfreq = pair_freq(X,sitefreq, pseudocounts, max_bin)
-    coupling_matrix = coupling(pairfreq, sitefreq, pseudocounts, max_bin)
+    coupling_matrix = coupling(pairfreq, sitefreq, max_bin)
     localfields = local_fields(coupling_matrix, pairfreq, sitefreq, pseudocounts, max_bin)
     cutoff = define_cutoff(X, 0.95, coupling_matrix, localfields, max_bin)
 
@@ -347,73 +305,63 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
     min_energies = min_along_axis(energies, 0)
 
-    def predict_row(row):
-        return (min_energies[row] >= cutoff).reveal()
-
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(predict_row, range(n_inst)))
-        for row, result in enumerate(results):
-            y_pred[row] = result
+    for row in range(n_inst):
+        y_pred[row] = (min_energies[row] >= cutoff).reveal()
 
     return y_pred
-
 # -------------------------------- TEST --------------------------------
 
-def test_training_phase():
-    X_train = Matrix(4, 2, sint)
-    X_train[0][0] = 0
-    X_train[0][1] = 0
-    X_train[1][0] = 1
-    X_train[1][1] = 2
-    X_train[2][0] = 1
-    X_train[2][1] = 0
-    X_train[3][0] = 1
-    X_train[3][1] = 2
 
-    max_bin = 3
+def data_preprocessing():
+
+    X_train = pd.read_csv("Programs/Source/EFC-MP-SPDZ/thesis/no_rabbit/data/train.csv")
+    X_test = pd.read_csv("Programs/Source/EFC-MP-SPDZ/thesis/no_rabbit/data/test.csv")
+
+    y_train = X_train["target"].values.tolist()
+    y_test = X_test["target"].values.tolist()
+
+    X_train = X_train.drop(columns=["target"]).values.tolist()
+    X_test = X_test.drop(columns=["target"]).values.tolist()
+
+    max_bin = max(max(max(row) for row in X_train), max(max(row) for row in X_test)) + 1
+
+    n_attr = len(X_train[0])
+    local_fields_shape = n_attr * (max_bin - 1)
+    coupling_matrix_shape = n_attr * (max_bin - 1)
+    return X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin
+
+def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
+    X_train = sint.input_tensor_via(0, X_train)
 
     coupling_matrix, localfields, cutoff = fit(X_train, 0.5, max_bin)
 
     # Save the classifier info to file
-    cutoff_arr = Array(1, sint)
+    cutoff_arr = Array(1, sfix)
     cutoff_arr[0] = cutoff
     cutoff_arr.write_to_file(position = 0)
     coupling_matrix.write_to_file(position = 1)
-    localfields.write_to_file(position = (1+(len(coupling_matrix)*len(coupling_matrix[0]))))
+
+    localfields.write_to_file(position = (1+(coupling_matrix_shape * coupling_matrix_shape)))
 
     print_ln("%s cutoff orig", cutoff.reveal())
     print_ln("%s couplong", coupling_matrix.reveal())
     print_ln("%s localfields", localfields.reveal())
 
 
-def test_inference_phase():
-    X_test = Matrix(4, 2, sint)
-    X_test[0][0] = 1
-    X_test[0][1] = 0
-    X_test[1][0] = 1
-    X_test[1][1] = 2
-    X_test[2][0] = 0
-    X_test[2][1] = 0
-    X_test[3][0] = 0
-    X_test[3][1] = 2
+def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
+    X_test = sint.input_tensor_via(0, X_test)
+    y_test = sint.input_tensor_via(0, y_test)
 
-    y_test = Array(4, sint)
-    y_test[0] = 1
-    y_test[1] = 1
-    y_test[2] = 0
-    y_test[3] = 1
 
-    max_bin = 3
+    coupling_matrix = Matrix(coupling_matrix_shape, coupling_matrix_shape, sfix)
+    localfields = Array(local_fields_shape, sfix)
 
-    coupling_matrix = Matrix(4, 4, sint)
-    localfields = Array(4, sint)
-
-    cutoff_arr_presaved = Array(1, sint)
+    cutoff_arr_presaved = Array(1, sfix)
     cutoff_arr_presaved.read_from_file(0)
     cutoff_presaved = cutoff_arr_presaved[0]
-    coupling_matrix_presaved = Matrix(len(coupling_matrix), len(coupling_matrix[0]), sint)
+    coupling_matrix_presaved = Matrix(len(coupling_matrix), len(coupling_matrix[0]), sfix)
     coupling_matrix_presaved.read_from_file(1)
-    localfields_presaved = Array(len(localfields), sint)
+    localfields_presaved = Array(len(localfields), sfix)
     localfields_presaved.read_from_file(1+(len(coupling_matrix)*len(coupling_matrix[0])))
 
     print_ln("%s cutoff presaved", cutoff_presaved.reveal())
@@ -422,15 +370,15 @@ def test_inference_phase():
 
     y_pred_presaved = predict(X_test, coupling_matrix_presaved, localfields_presaved, cutoff_presaved, max_bin)
     y_pred_presaved.print_reveal_nested()
-    #precision, recall = calculate_metrics(y_test, y_pred_presaved)
+    precision, recall = calculate_metrics(y_test, y_pred_presaved)
 
 #----------------------------------- MAIN -----------------------------------
+
+X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
+
 start_timer(1)
-test_training_phase()
+test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
-
 start_timer(2)
-test_inference_phase()
+test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(2)
-
-

@@ -170,14 +170,19 @@ def cantor(x, y):
 # ------------------ EFC ------------------
 
 def site_freq(X_view, psdcounts, max_bin):
+    print("!!!!!!!!!!!!!!!")
+    print(X_view, psdcounts, max_bin)
+    print("!!!!!!!!!!!!!!!")
     n_attr = len(X_view[1])  # total feature
     sitefreq = zeros_2d(n_attr, max_bin)
 
     for i in range(n_attr):
         for aa in range(max_bin):
             sitefreq[i][aa] = sum(equal_scalar([row[i] for row in X_view], aa))
+    
+    print("Site freq 1:", sitefreq)
 
-    sitefreq = divide_2d_matrix_by_scalar(sitefreq, len(X_view))  # /= len(X_view)
+    sitefreq = divide_2d_matrix_by_scalar(sitefreq, len(X_view))
 
     sitefreq = multiply_2d_matrix_by_scalar(sitefreq, 1 - psdcounts)
 
@@ -242,6 +247,8 @@ def local_fields(coupling_view, sitefreq_view, max_bin):
                 for aj in range(max_bin - 1):
                     acc *= (
                             coupling_view[i * (max_bin - 1) + ai][j * (max_bin - 1) + aj] ** sitefreq_view[j][aj])
+            
+            print("acc: ", acc)
             fields[i * (max_bin - 1) + ai] /= acc
     print("Localfields", fields)
     return fields
@@ -297,7 +304,7 @@ def predict(X, sitefreq, pairfreq, coupling_matrix, localfields, cutoff, max_bin
         if minimum_energy < cutoff:
             y_pred.append(0)
         else:
-            y_pred.append(1) #TODO: or 0 1 the other way round???
+            y_pred.append(1)
     return y_pred
 
 def calculate_metrics(y_test, y_pred, positive_label=1):

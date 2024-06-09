@@ -61,7 +61,7 @@ def LTBits(R, x):
     w = [z[i] - z[i + 1] for i in range(BIT_LENGTH)]
     return sum((1-R_bits[i]) & w[i] for i in range(BIT_LENGTH))
 
-number_of_runs = 1000
+number_of_runs = 10000
 
 edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
 adder_result = BitAdder(edabit0[1], edabit1[1])
@@ -69,48 +69,63 @@ w4 = adder_result[-1]
 adder_result_zero = BitAdderZero(edabit1[1])
 w4zero = adder_result_zero[-1]
 
+# Test with various inputs to ensure correctness
+inputs = Matrix(5, 2, sint)
+
+# Initializing the values
+inputs[0][0] = sint(-2)
+inputs[0][1] = sint(0)
+inputs[1][0] = sint(0)
+inputs[1][1] = sint(-2)
+inputs[2][0] = sint(2)
+inputs[2][1] = sint(2)
+inputs[3][0] = sint(5)
+inputs[3][1] = sint(3)
+inputs[4][0] = sint(3)
+inputs[4][1] = sint(5)
+
+# Timer and loop for LTS
 start_timer(1)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    y = sint(0)
-    print_ln("%s", LTS(x, y).reveal())
+    x, y = inputs[i % len(inputs)]
+    print_ln("LTS(%s, %s) = %s", x.reveal(), y.reveal(), LTS(x, y).reveal())
 stop_timer(1)
 
+# Timer and loop for LTZ
 start_timer(2)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    print_ln("%s", LTZ(x).reveal())
+    x = inputs[i % len(inputs)][0]
+    print_ln("LTZ(%s) = %s", x.reveal(), LTZ(x).reveal())
 stop_timer(2)
 
+# Timer and loop for EQS
 start_timer(3)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    y = sint(0)
-    print_ln("%s", EQS(x, y).reveal())
+    x, y = inputs[i % len(inputs)]
+    print_ln("EQS(%s, %s) = %s", x.reveal(), y.reveal(), EQS(x, y).reveal())
 stop_timer(3)
 
+# Timer and loop for native comparison operators
 start_timer(4)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    y = sint(0)
-    print_ln("%s", (x<y).reveal())
+    x, y = inputs[i % len(inputs)]
+    print_ln("%s < %s = %s", x.reveal(), y.reveal(), (x < y).reveal())
 stop_timer(4)
 
 start_timer(5)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    print_ln("%s", (x<0).reveal())
+    x = inputs[i % len(inputs)][0]
+    print_ln("%s < 0 = %s", x.reveal(), (x < 0).reveal())
 stop_timer(5)
 
 start_timer(6)
 @for_range_opt(number_of_runs)
 def f(i):
-    x = sint(-2)
-    y = sint(0)
-    print_ln("%s", (x == y).reveal())
+    x, y = inputs[i % len(inputs)]
+    print_ln("%s == %s = %s", x.reveal(), y.reveal(), (x == y).reveal())
 stop_timer(6)

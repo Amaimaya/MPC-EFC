@@ -284,7 +284,7 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
 
     pairfreq = divide_4d_matrix_by_scalar(pairfreq, n_inst)
     pairfreq = multiply_4d_matrix_by_scalar(pairfreq, 1-psdcounts)
-    pairfreq += (psdcounts / (max_bin ** 2))
+    pairfreq += sfix(psdcounts / (max_bin ** 2))
 
 
     @for_range_opt(n_attr)
@@ -422,49 +422,50 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 # -------------------------------- TEST --------------------------------
 
-def test_training_phase():
-    X_train = Matrix(4, 2, sint)
-    X_train[0][0] = 0
-    X_train[0][1] = 0
-    X_train[1][0] = 1
-    X_train[1][1] = 2
-    X_train[2][0] = 1
-    X_train[2][1] = 0
-    X_train[3][0] = 1
-    X_train[3][1] = 2
 
-    max_bin = 3
+def data_preprocessing():
 
-    coupling_matrix, localfields, cutoff = fit(X_train, sfix(0.5), max_bin)
+    X_train = pd.read_csv("Programs/Source/EFC-MP-SPDZ/thesis/no_rabbit/data/train.csv")
+    X_test = pd.read_csv("Programs/Source/EFC-MP-SPDZ/thesis/no_rabbit/data/test.csv")
+
+    y_train = X_train["target"].values.tolist()
+    y_test = X_test["target"].values.tolist()
+
+    X_train = X_train.drop(columns=["target"]).values.tolist()
+    X_test = X_test.drop(columns=["target"]).values.tolist()
+
+    max_bin = max(max(max(row) for row in X_train), max(max(row) for row in X_test)) + 1
+
+    n_attr = len(X_train[0])
+    local_fields_shape = n_attr * (max_bin - 1)
+    coupling_matrix_shape = n_attr * (max_bin - 1)
+    return X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin
+
+def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
+    X_train = sint.input_tensor_via(0, X_train)
+
+    coupling_matrix, localfields, cutoff = fit(X_train, 0.5, max_bin)
 
     # Save the classifier info to file
     cutoff_arr = Array(1, sfix)
     cutoff_arr[0] = cutoff
     cutoff_arr.write_to_file(position = 0)
     coupling_matrix.write_to_file(position = 1)
-    localfields.write_to_file(position = (1+(len(coupling_matrix)*len(coupling_matrix[0]))))
 
-def test_inference_phase():
-    X_test = Matrix(4, 2, sint)
-    X_test[0][0] = 1
-    X_test[0][1] = 0
-    X_test[1][0] = 1
-    X_test[1][1] = 2
-    X_test[2][0] = 0
-    X_test[2][1] = 0
-    X_test[3][0] = 0
-    X_test[3][1] = 2
+    localfields.write_to_file(position = (1+(coupling_matrix_shape * coupling_matrix_shape)))
 
-    y_test = Array(4, sint)
-    y_test[0] = 1
-    y_test[1] = 1
-    y_test[2] = 0
-    y_test[3] = 1
+    print_ln("%s cutoff orig", cutoff.reveal())
+    print_ln("%s couplong", coupling_matrix.reveal())
+    print_ln("%s localfields", localfields.reveal())
 
-    max_bin = 3
 
-    coupling_matrix = Matrix(4, 4, sfix)
-    localfields = Array(4, sfix)
+def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
+    X_test = sint.input_tensor_via(0, X_test)
+    y_test = sint.input_tensor_via(0, y_test)
+
+
+    coupling_matrix = Matrix(coupling_matrix_shape, coupling_matrix_shape, sfix)
+    localfields = Array(local_fields_shape, sfix)
 
     cutoff_arr_presaved = Array(1, sfix)
     cutoff_arr_presaved.read_from_file(0)
@@ -474,15 +475,21 @@ def test_inference_phase():
     localfields_presaved = Array(len(localfields), sfix)
     localfields_presaved.read_from_file(1+(len(coupling_matrix)*len(coupling_matrix[0])))
 
+    print_ln("%s cutoff presaved", cutoff_presaved.reveal())
+    print_ln("%s couplong presaved", coupling_matrix_presaved.reveal())
+    print_ln("%s localfields presaved", localfields_presaved.reveal())
+
     y_pred_presaved = predict(X_test, coupling_matrix_presaved, localfields_presaved, cutoff_presaved, max_bin)
     y_pred_presaved.print_reveal_nested()
     precision, recall = calculate_metrics(y_test, y_pred_presaved)
 
 #----------------------------------- MAIN -----------------------------------
-start_timer(1)
-test_training_phase()
-stop_timer(1)
 
+X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
+
+start_timer(1)
+test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
+stop_timer(1)
 start_timer(2)
-test_inference_phase()
+test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(2)
