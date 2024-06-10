@@ -45,15 +45,16 @@ def EQS(x, y):
     return LTZ(squared_difference)
 
 def LTZ(x):
-    #edabit1 = sint.get_edabit(EDABIT_BIT_LENGTH, True)
+    edabit1 = sint.get_edabit(EDABIT_BIT_LENGTH, True)
     a = (edabit1[0] - x).reveal()
     T = a + HALF_PRIME
     w2 = LTBits(T - 1, edabit1[1])
     w3 = T < 0
-    #adder_result_zero = BitAdderZero(edabit1[1])
+    adder_result_zero = BitAdderZero(edabit1[1])
     w5 = LTBits(a, adder_result_zero[:-1])
     w =  w2 + w3 - w4zero - w5
     return w
+
 
 def BitAdderZero(r1_bits):  # Protocol 4.4 in [1], modified to handle an array of zeros. Only used for LTZ
     # Calculate ds with r0_bits being zero
