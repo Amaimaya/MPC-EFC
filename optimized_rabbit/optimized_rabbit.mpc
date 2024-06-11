@@ -316,6 +316,7 @@ def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
 def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
     n_inst = len(sitefreq_view)
     fields = Array(n_inst * (max_bin - 1), sint)
+    acc = Array(n_inst * (max_bin - 1), sint)
 
     @for_range_opt(n_inst)
     def _(i):
@@ -323,15 +324,13 @@ def local_fields(coupling_view, sitefreq_view, psdcounts, max_bin):
         def _(ai):
             idx = i * (max_bin - 1) + ai
             log_value = sitefreq_view[i][ai] / (sitefreq_view[i][max_bin - 1])
-            acc = Array((n_inst*(max_bin - 1))+1, sfix)
-            acc[0] = 1
             @for_range_opt(n_inst)
             def _(j):
                 @for_range_opt(max_bin - 1)
                 def _(aj):
                     coupling_smaller = coupling_view[idx][j * (max_bin - 1) + aj]*divi
                     sitefreq_smaller = sitefreq_view[j][aj] * divi
-                    acc[1+ (j*(max_bin-1)) + aj] = acc[(j*(max_bin-1)) + aj] * (-coupling_smaller * sitefreq_smaller) # Improvement: We don't need the exponential coupling_view, so no log of coupling or local_fields later
+                    acc[idx] += (-coupling_smaller * sitefreq_smaller) # Improvement: We don't need the exponential coupling_view, so no log of coupling or local_fields later
             fields[idx] = mpc_math.floor_fx((mpc_math.log_fx(log_value, E) - acc[n_inst*(max_bin - 1)])*multi)
 
     return fields
