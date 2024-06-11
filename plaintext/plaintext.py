@@ -1,5 +1,7 @@
 import math
 
+import pandas as pd
+
 # ------------ UTILS ------------
 
 def unique_f(ar, return_index=False, return_inverse=False, return_counts=False):
@@ -327,25 +329,17 @@ def calculate_metrics(y_test, y_pred, positive_label=1):
 
  # ------------------ TESTING ------------------
 
-X_train = [
-    [0, 0],
-    [1, 2],
-    [1, 0],
-    [1, 2]
-]
+X_train = pd.read_csv("../data/train.csv")
+X_test = pd.read_csv("../data/test.csv")
 
-y_train = [0, 0, 1, 0]
+y_train = X_train["target"].values.tolist()
+y_test = X_test["target"].values.tolist()
 
-X_test = [
-    [1, 0],
-    [1, 2],
-    [0, 0],
-    [0, 2]
-]
+X_train = X_train.drop(columns=["target"]).values.tolist()
+X_test = X_test.drop(columns=["target"]).values.tolist()
 
-y_test = [1, 1, 0, 1]
+max_bin = max(max(max(row) for row in X_train), max(max(row) for row in X_test)) + 1
 
-max_bin = 3
 sitefreq, pairfreq, coupling_matrix, localfields, cutoff = fit(X_train, 0.5, max_bin)
 y_pred = predict(X_test, sitefreq, pairfreq, coupling_matrix, localfields, cutoff,  max_bin)
 
