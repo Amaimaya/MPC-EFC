@@ -482,8 +482,6 @@ def test_inference_phase():
 #----------------------------------- MAIN -----------------------------------
 number_of_runs = 1
 
-#program.use_edabit(True)
-
 edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
 adder_result = BitAdder(edabit0[1], edabit1[1])
 w4 = adder_result[-1]

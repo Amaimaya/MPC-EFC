@@ -244,8 +244,8 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
 
-    print_ln("coupling_matrix energy: %s", coupling_matrix.reveal())
-    print_ln("local_fields energy: %s", local_fields.reveal())
+    #print_ln("coupling_matrix energy: %s", coupling_matrix.reveal())
+    #print_ln("local_fields energy: %s", local_fields.reveal())
 
     coupling_matrix_len = len(coupling_matrix)
     local_field_len = len(local_fields)
@@ -280,7 +280,7 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
 
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sfix.dot_product(local_fields, selector_fields))
 
-    print_ln("Energies: %s", energies.reveal())
+    #print_ln("Energies: %s", energies.reveal())
 
     return energies
 
@@ -313,8 +313,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/small/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/small/test.csv")
+    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/medium/train.csv")
+    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/medium/test.csv")
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
@@ -342,9 +342,9 @@ def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_
 
     localfields.write_to_file(position = (1+(coupling_matrix_shape * coupling_matrix_shape)))
 
-    print_ln("%s cutoff orig", cutoff.reveal())
-    print_ln("%s couplong", coupling_matrix.reveal())
-    print_ln("%s localfields", localfields.reveal())
+    #print_ln("%s cutoff orig", cutoff.reveal())
+    #print_ln("%s couplong", coupling_matrix.reveal())
+    #print_ln("%s localfields", localfields.reveal())
 
 
 def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
@@ -363,9 +363,9 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
     localfields_presaved = Array(len(localfields), sfix)
     localfields_presaved.read_from_file(1+(len(coupling_matrix)*len(coupling_matrix[0])))
 
-    print_ln("%s cutoff presaved", cutoff_presaved.reveal())
-    print_ln("%s couplong presaved", coupling_matrix_presaved.reveal())
-    print_ln("%s localfields presaved", localfields_presaved.reveal())
+    #print_ln("%s cutoff presaved", cutoff_presaved.reveal())
+    #print_ln("%s couplong presaved", coupling_matrix_presaved.reveal())
+    #print_ln("%s localfields presaved", localfields_presaved.reveal())
 
     y_pred_presaved = predict(X_test, coupling_matrix_presaved, localfields_presaved, cutoff_presaved, max_bin)
     y_pred_presaved.print_reveal_nested()

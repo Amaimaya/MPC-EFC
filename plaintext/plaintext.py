@@ -350,9 +350,9 @@ y_pred = predict(X_test, sitefreq, pairfreq, coupling_matrix, localfields, cutof
 stop = time.time()
 print("Predict: ", stop - start, " seconds")
 
-#print("y pred", y_pred)
+print("y pred", y_pred)
 
 precision, recall = calculate_metrics(y_test, y_pred)
 
-#print("Precision:", precision)
+print("Precision:", precision)
 #print("Recall:", recall)
