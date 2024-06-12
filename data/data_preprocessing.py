@@ -24,7 +24,7 @@ file_path = './heart_failure_clinical_records.csv'
 data = pd.read_csv(file_path)
 
 # Drop the first five columns
-data = data.iloc[:, 5:]
+#data = data.iloc[:, 5:]
 
 # Separate features and labels
 features = data.iloc[:, :-1]  # All columns except the last one
@@ -38,7 +38,7 @@ normalized_features = scaler.fit_transform(features)
 normalized_features_df = pd.DataFrame(normalized_features, columns=features.columns)
 
 # Bin the normalized features
-max_bin = 5  # Replace with your desired max_bin value
+max_bin = 20  # Replace with your desired max_bin value
 binned_features = bin_data(normalized_features_df, max_bin)
 
 # Combine binned features and labels

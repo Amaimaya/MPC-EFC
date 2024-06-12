@@ -1,4 +1,5 @@
 import math
+import time
 
 import pandas as pd
 
@@ -329,8 +330,8 @@ def calculate_metrics(y_test, y_pred, positive_label=1):
 
  # ------------------ TESTING ------------------
 
-X_train = pd.read_csv("../data/train.csv")
-X_test = pd.read_csv("../data/test.csv")
+X_train = pd.read_csv("../data/mediumbig/train.csv")
+X_test = pd.read_csv("../data/mediumbig/test.csv")
 
 y_train = X_train["target"].values.tolist()
 y_test = X_test["target"].values.tolist()
@@ -340,12 +341,18 @@ X_test = X_test.drop(columns=["target"]).values.tolist()
 
 max_bin = max(max(max(row) for row in X_train), max(max(row) for row in X_test)) + 1
 
+start = time.time()
 sitefreq, pairfreq, coupling_matrix, localfields, cutoff = fit(X_train, 0.5, max_bin)
+stop = time.time()
+print("Fit: ", stop - start, " seconds")
+start = time.time()
 y_pred = predict(X_test, sitefreq, pairfreq, coupling_matrix, localfields, cutoff,  max_bin)
+stop = time.time()
+print("Predict: ", stop - start, " seconds")
 
-print("y pred", y_pred)
+#print("y pred", y_pred)
 
 precision, recall = calculate_metrics(y_test, y_pred)
 
-print("Precision:", precision)
-print("Recall:", recall)
+#print("Precision:", precision)
+#print("Recall:", recall)

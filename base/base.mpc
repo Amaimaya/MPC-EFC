@@ -424,8 +424,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/test.csv")
+    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/small/train.csv")
+    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/small/test.csv")
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
