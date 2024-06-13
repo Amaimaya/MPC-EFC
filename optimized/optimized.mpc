@@ -3,6 +3,7 @@ import sys
 import math
 import warnings
 import pandas as pd
+import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.utils.multiclass import type_of_target
@@ -289,47 +290,20 @@ def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
 
 
 def compute_energy_test(X, coupling_matrix, local_fields, max_bin):
-    def zeros_1d(shape_a):
-        return [0 for _ in range(shape_a)]
-
-    def zeros_2d(shape_a, shape_b):
-        return [[0 for _ in range(shape_b)] for _ in range(shape_a)]
+    fields_selector = np.load('Programs/Source/MPC-EFC/data/small/fields_selectors.npy')
+    coupling_selector = np.load('Programs/Source/MPC-EFC/data/small/matrix_selectors.npy')
         
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
 
     for i in range(n_inst):
-        matrix_selector1 = zeros_1d(len(local_fields))
-        matrix_selector2 = zeros_2d(len(coupling_matrix), len(coupling_matrix[0]))
-        for j in range(n_attr):
-            j_value = X[i][j]
-            is_j_value = 1 if (j_value != (max_bin-1)) else 0
+        print(fields_selector[i])
+        print(coupling_selector[i])
+        energies[i] -= (dot_product_neg_matrix(coupling_matrix, coupling_selector[i].tolist()) + dot_product(local_fields, fields_selector[i].tolist()))
 
-            for k in range(j, n_attr):
-                k_value = max_bin-1 if is_j_value == 0 else X[i][k]
-                is_k_value = 1 if (k_value != (max_bin-1)) else 0
-
-                stop = False
-                for l in range(len(coupling_matrix)):
-                    if stop:
-                        break
-                    for m in range(len(coupling_matrix[0])):
-                        if l == (j * (max_bin - 1) + j_value) and m == (k * (max_bin - 1) + k_value) and is_k_value:
-                            matrix_selector2[l][m] = 1
-                            stop = True
-                            break
-
-            for k in range(len(local_fields)):
-                if k == (j * (max_bin - 1) + j_value) and is_j_value:
-                    matrix_selector1[k] = 1
-                    break
-
-        energies[i] -= (dot_product_neg_matrix(coupling_matrix, matrix_selector2) + dot_product(local_fields, matrix_selector1))
-
-    #print_ln("Energies: %s", energies.reveal())
+    print_ln("Energies: %s", energies.reveal())
 
     return energies
-
 
 def fit(X, pseudocounts, max_bin):
     sitefreq = site_freq(X, pseudocounts, max_bin)
@@ -359,8 +333,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/big/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/big/test.csv")
+    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/small/train.csv")
+    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/small/test.csv")
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
@@ -418,7 +392,7 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
 start_timer(1)
-#test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
+test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
