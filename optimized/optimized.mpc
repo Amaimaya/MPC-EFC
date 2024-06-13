@@ -290,15 +290,13 @@ def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
 
 
 def compute_energy_test(X, coupling_matrix, local_fields, max_bin):
-    fields_selector = np.load('Programs/Source/MPC-EFC/data/small/fields_selectors.npy')
-    coupling_selector = np.load('Programs/Source/MPC-EFC/data/small/matrix_selectors.npy')
+    fields_selector = np.load('Programs/Source/MPC-EFC/data/' + SIZE + '/fields_selectors.npy')
+    coupling_selector = np.load('Programs/Source/MPC-EFC/data/' + SIZE + '/matrix_selectors.npy')
         
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
 
     for i in range(n_inst):
-        print(fields_selector[i])
-        print(coupling_selector[i])
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, coupling_selector[i].tolist()) + dot_product(local_fields, fields_selector[i].tolist()))
 
     print_ln("Energies: %s", energies.reveal())
@@ -333,8 +331,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/small/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/small/test.csv")
+    X_train = pd.read_csv('Programs/Source/MPC-EFC/data/' + SIZE + '/train.csv')
+    X_test = pd.read_csv('Programs/Source/MPC-EFC/data/' + SIZE + '/test.csv')
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
@@ -389,11 +387,17 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
 
 #----------------------------------- MAIN -----------------------------------
 
+SIZE = "medium" 
+
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
+'''print_ln("Running training phase...")
 start_timer(1)
 test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
+print_ln("Finished running training phase...")'''
+print_ln("Running test phase...")
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(2)
+print_ln("Finished running test phase...")

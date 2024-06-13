@@ -1,18 +1,20 @@
+import time
 import pandas as pd
 import numpy as np
 
+SIZE = "small"
 
-X = pd.read_csv("../data/small/test.csv")
-X_train = pd.read_csv("../data/small/train.csv")
+print("Running test selectors...")
+
+X = pd.read_csv("../data/" + SIZE + "/test.csv")
+X_train = pd.read_csv("../data/" + SIZE + "/train.csv")
 max_value_X = X.max().max()
 max_value_X_train = X_train.max().max()
 max_bin = max(max_value_X, max_value_X_train) + 1
 n_inst = X_train.shape[0]
 n_attr = X_train.shape[1]-1 # because +1 due to y_pred
-print(n_attr)
 len_local_fields = n_attr * (max_bin - 1)
 len_coupling_matrix = n_attr * (max_bin - 1)
-print(len_local_fields)
 def compute_selectors():
     all_fields_selectors = []
     all_matrix_selectors = []
@@ -56,14 +58,16 @@ def compute_selectors():
         all_fields_selectors.append(matrix_selector1)
         all_matrix_selectors.append(matrix_selector2)
     
-        print(matrix_selector1)
-        print(matrix_selector2)
     return np.array(all_fields_selectors), np.array(all_matrix_selectors)
 
 # Compute selectors
+start = time.time()
 all_fields_selectors, all_matrix_selectors = compute_selectors()
+stop = time.time()
+print("Test selector took: ", stop - start, " seconds")
 
 # Save arrays to numpy files
-np.save("../data/small/fields_selectors.npy", all_fields_selectors)
-np.save("../data/small/matrix_selectors.npy", all_matrix_selectors)
+np.save("../data/" + SIZE + "/fields_selectors.npy", all_fields_selectors)
+np.save("../data/" + SIZE + "/matrix_selectors.npy", all_matrix_selectors)
 
+print("Finished running test selectors...")
