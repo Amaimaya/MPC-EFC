@@ -94,13 +94,17 @@ def extract_columns(X_view, i, j):
 
     return column_i, column_j
 
+def dot_product(x, y):
+    dp = 0
+    for i in range(len(x)):
+        dp += (x[i]*y[i])
+    return dp
+
 def dot_product_neg_matrix(x, y):
-    dp = Array(len(x)+1, sfix)
-    dp[0] = sfix(0)
-    @for_range_opt(len(x))
-    def _(i):
-        dp[i] = sfix.dot_product(0 - x[i], y[i])
-    return sum(dp[i] for i in range(len(dp)))
+    dp = 0
+    for i in range(len(x)):
+        dp += dot_product(0-x[i], y[i])
+    return dp
 
 def inverse_covariance_matrix(A, iterations=10):
     n = len(A)
@@ -239,8 +243,7 @@ def local_fields(coupling_view, pairfreq_view, sitefreq_view, psdcounts, max_bin
             fields[idx] = mpc_math.log_fx(fields[idx], E) - acc[idx]
     return fields
 
-
-def compute_energy(X, coupling_matrix, local_fields, max_bin):
+def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
 
@@ -285,6 +288,49 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
     return energies
 
 
+def compute_energy_test(X, coupling_matrix, local_fields, max_bin):
+    def zeros_1d(shape_a):
+        return [0 for _ in range(shape_a)]
+
+    def zeros_2d(shape_a, shape_b):
+        return [[0 for _ in range(shape_b)] for _ in range(shape_a)]
+        
+    n_inst, n_attr = len(X), len(X[0])
+    energies = Array(n_inst, sfix)
+
+    for i in range(n_inst):
+        matrix_selector1 = zeros_1d(len(local_fields))
+        matrix_selector2 = zeros_2d(len(coupling_matrix), len(coupling_matrix[0]))
+        for j in range(n_attr):
+            j_value = X[i][j]
+            is_j_value = 1 if (j_value != (max_bin-1)) else 0
+
+            for k in range(j, n_attr):
+                k_value = max_bin-1 if is_j_value == 0 else X[i][k]
+                is_k_value = 1 if (k_value != (max_bin-1)) else 0
+
+                stop = False
+                for l in range(len(coupling_matrix)):
+                    if stop:
+                        break
+                    for m in range(len(coupling_matrix[0])):
+                        if l == (j * (max_bin - 1) + j_value) and m == (k * (max_bin - 1) + k_value) and is_k_value:
+                            matrix_selector2[l][m] = 1
+                            stop = True
+                            break
+
+            for k in range(len(local_fields)):
+                if k == (j * (max_bin - 1) + j_value) and is_j_value:
+                    matrix_selector1[k] = 1
+                    break
+
+        energies[i] -= (dot_product_neg_matrix(coupling_matrix, matrix_selector2) + dot_product(local_fields, matrix_selector1))
+
+    #print_ln("Energies: %s", energies.reveal())
+
+    return energies
+
+
 def fit(X, pseudocounts, max_bin):
     sitefreq = site_freq(X, pseudocounts, max_bin)
     pairfreq = pair_freq(X,sitefreq, pseudocounts, max_bin)
@@ -295,11 +341,11 @@ def fit(X, pseudocounts, max_bin):
     return coupling_matrix, localfields, cutoff
 
 def define_cutoff(X, cutoff_quantile, coupling_matrix, local_fields, max_bin):
-    energies = compute_energy(X, coupling_matrix, local_fields, max_bin)
+    energies = compute_energy_train(X, coupling_matrix, local_fields, max_bin)
     return find_nth_largest_value_from_array(energies, int(len(energies) * cutoff_quantile))
 
 def predict(X, coupling_matrix, localfields, cutoff, max_bin):
-    energies = [compute_energy(X, coupling_matrix, localfields, max_bin)]
+    energies = [compute_energy_test(X, coupling_matrix, localfields, max_bin)]
     n_inst = len(X)
     y_pred = Array(n_inst, cint)
 
@@ -313,8 +359,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/medium/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/medium/test.csv")
+    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/big/train.csv")
+    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/big/test.csv")
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
@@ -348,10 +394,6 @@ def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_
 
 
 def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
-    X_test = sint.input_tensor_via(0, X_test)
-    y_test = sint.input_tensor_via(0, y_test)
-
-
     coupling_matrix = Matrix(coupling_matrix_shape, coupling_matrix_shape, sfix)
     localfields = Array(local_fields_shape, sfix)
 
@@ -376,7 +418,7 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
 start_timer(1)
-test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
+#test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)

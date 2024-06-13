@@ -65,6 +65,8 @@ number_of_runs = 10000
 
 edabit0, edabit1 = [sint.get_edabit(EDABIT_BIT_LENGTH, True) for i in range(2)]
 adder_result = BitAdder(edabit0[1], edabit1[1])
+print_ln("%s", edabit0.reveal())
+print_ln("%s", edabit1.reveal())
 w4 = adder_result[-1]
 adder_result_zero = BitAdderZero(edabit1[1])
 w4zero = adder_result_zero[-1]
@@ -84,7 +86,7 @@ inputs[3][1] = sint(3)
 inputs[4][0] = sint(3)
 inputs[4][1] = sint(5)
 
-# Timer and loop for LTS
+'''# Timer and loop for LTS
 start_timer(1)
 @for_range_opt(number_of_runs)
 def f(i):
@@ -128,4 +130,4 @@ start_timer(6)
 def f(i):
     x, y = inputs[i % len(inputs)]
     print_ln("%s == %s = %s", x.reveal(), y.reveal(), (x == y).reveal())
-stop_timer(6)
+stop_timer(6)'''
