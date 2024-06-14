@@ -248,9 +248,6 @@ def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
 
-    #print_ln("coupling_matrix energy: %s", coupling_matrix.reveal())
-    #print_ln("local_fields energy: %s", local_fields.reveal())
-
     coupling_matrix_len = len(coupling_matrix)
     local_field_len = len(local_fields)
 
@@ -286,14 +283,12 @@ def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
 
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sfix.dot_product(local_fields, selector_fields))
 
-    #print_ln("Energies: %s", energies.reveal())
-
     return energies
 
 
 def compute_energy_test(X, coupling_matrix, local_fields, max_bin):
-    fields_selector = np.load('Programs/Source/MPC-EFC/data/' + SIZE + '/fields_selectors.npy')
-    coupling_selector = np.load('Programs/Source/MPC-EFC/data/' + SIZE + '/matrix_selectors.npy')
+    fields_selector = np.load('Programs/Source/MPC-EFC/data/' + DATASET + '/fields_selectors.npy')
+    coupling_selector = np.load('Programs/Source/MPC-EFC/data/' + DATASET + '/matrix_selectors.npy')
         
     n_inst, n_attr = len(X), len(X[0])
     energies = Array(n_inst, sfix)
@@ -301,15 +296,18 @@ def compute_energy_test(X, coupling_matrix, local_fields, max_bin):
     for i in range(n_inst):
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, coupling_selector[i].tolist()) + dot_product(local_fields, fields_selector[i].tolist()))
 
-    print_ln("Energies: %s", energies.reveal())
-
     return energies
 
 def fit(X, pseudocounts, max_bin):
+    print_ln("Computing sitefreq...")
     sitefreq = site_freq(X, pseudocounts, max_bin)
+    print_ln("Computing pairfreq...")
     pairfreq = pair_freq(X,sitefreq, pseudocounts, max_bin)
+    print_ln("Computing coupling matrix...")
     coupling_matrix = coupling(pairfreq, sitefreq, max_bin)
+    print_ln("Computing local fields...")
     localfields = local_fields(coupling_matrix, pairfreq, sitefreq, pseudocounts, max_bin)
+    print_ln("Computing cutoff...")
     cutoff = define_cutoff(X, 0.95, coupling_matrix, localfields, max_bin)
 
     return coupling_matrix, localfields, cutoff
@@ -319,6 +317,7 @@ def define_cutoff(X, cutoff_quantile, coupling_matrix, local_fields, max_bin):
     return find_nth_largest_value_from_array(energies, int(len(energies) * cutoff_quantile))
 
 def predict(X, coupling_matrix, localfields, cutoff, max_bin):
+    print_ln("Computing eneries...")
     energies = [compute_energy_test(X, coupling_matrix, localfields, max_bin)]
     n_inst = len(X)
     y_pred = Array(n_inst, cint)
@@ -362,10 +361,6 @@ def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_
 
     localfields.write_to_file(position = (1+(coupling_matrix_shape * coupling_matrix_shape)))
 
-    #print_ln("%s cutoff orig", cutoff.reveal())
-    #print_ln("%s couplong", coupling_matrix.reveal())
-    #print_ln("%s localfields", localfields.reveal())
-
 
 def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
     coupling_matrix = Matrix(coupling_matrix_shape, coupling_matrix_shape, sfix)
@@ -379,17 +374,13 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
     localfields_presaved = Array(len(localfields), sfix)
     localfields_presaved.read_from_file(1+(len(coupling_matrix)*len(coupling_matrix[0])))
 
-    #print_ln("%s cutoff presaved", cutoff_presaved.reveal())
-    #print_ln("%s couplong presaved", coupling_matrix_presaved.reveal())
-    #print_ln("%s localfields presaved", localfields_presaved.reveal())
-
     y_pred_presaved = predict(X_test, coupling_matrix_presaved, localfields_presaved, cutoff_presaved, max_bin)
     y_pred_presaved.print_reveal_nested()
     precision, recall = calculate_metrics(y_test, y_pred_presaved)
 
 #----------------------------------- MAIN -----------------------------------
 
-SIZE = "medium" 
+DATASET = "dataset1" 
 
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 

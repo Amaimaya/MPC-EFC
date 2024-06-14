@@ -2,11 +2,11 @@ import time
 import pandas as pd
 import numpy as np
 
-SIZE = "medium"
+DATASET = "dataset1"
 print("Running test selectors...")
 
-X = pd.read_csv("../data/" + SIZE + "/test.csv")
-X_train = pd.read_csv("../data/" + SIZE + "/train.csv")
+X = pd.read_csv("../data/" + DATASET + "/test.csv")
+X_train = pd.read_csv("../data/" + DATASET + "/train.csv")
 max_value_X = X.max().max()
 max_value_X_train = X_train.max().max()
 max_bin = max(max_value_X, max_value_X_train) + 1

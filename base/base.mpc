@@ -313,7 +313,7 @@ def coupling(pairfreq_view, sitefreq_view, psdcounts, max_bin):
                 def _(aj):
                     corr_matrix[i * (max_bin - 1) + ai][j * (max_bin - 1) + aj] = (
                             pairfreq_view[i][ai][j][aj] - sitefreq_view[i][ai] * sitefreq_view[j][aj])
-    print_ln("Corr_matrix %s", corr_matrix.reveal())
+    
     inv_corr = ml.mr(corr_matrix, 10)
     neg_matrix = negative_matrix(inv_corr)
     exp_matrix = exponential_matrix(neg_matrix)
@@ -341,10 +341,6 @@ def local_fields(coupling_view, pairfreq_view, sitefreq_view, psdcounts, max_bin
 def compute_energy(X, coupling_matrix, local_fields, max_bin):
     n_inst, n_attr = len(X), len(X[0])
     energies = zeros_1d_by_shape(n_inst)
-
-    #print_ln("coupling_matrix: %s", coupling_matrix.reveal())
-    #print_ln("local_fields: %s", local_fields.reveal())
-
 
     @for_range_opt(n_inst)
     def _(i):
@@ -379,7 +375,6 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
         energies[i] -= dot_product_matrix(coupling_matrix, matrix_selector2)
         energies[i] -= dot_product(local_fields, matrix_selector1)
 
-    #print_ln("energies: %s", energies.reveal())
     return energies
 
 def fit(X, pseudocounts, max_bin):
@@ -391,7 +386,6 @@ def fit(X, pseudocounts, max_bin):
     localfields = log_1d(localfields)
 
     cutoff = define_cutoff(X, 0.95, coupling_matrix, localfields, max_bin)
-    print_ln("cutoff: %s", cutoff.reveal())
     return coupling_matrix, localfields, cutoff
 
 def define_cutoff(X, cutoff_quantile, coupling_matrix, local_fields, max_bin):
@@ -452,10 +446,6 @@ def test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_
 
     localfields.write_to_file(position = (1+(coupling_matrix_shape * coupling_matrix_shape)))
 
-    #print_ln("%s cutoff orig", cutoff.reveal())
-    #print_ln("%s couplong", coupling_matrix.reveal())
-    #print_ln("%s localfields", localfields.reveal())
-
 
 def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape):
     X_test = sint.input_tensor_via(0, X_test)
@@ -473,10 +463,6 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
     localfields_presaved = Array(len(localfields), sfix)
     localfields_presaved.read_from_file(1+(len(coupling_matrix)*len(coupling_matrix[0])))
 
-    #print_ln("%s cutoff presaved", cutoff_presaved.reveal())
-    #print_ln("%s couplong presaved", coupling_matrix_presaved.reveal())
-    #print_ln("%s localfields presaved", localfields_presaved.reveal())
-
     y_pred_presaved = predict(X_test, coupling_matrix_presaved, localfields_presaved, cutoff_presaved, max_bin)
     y_pred_presaved.print_reveal_nested()
     precision, recall = calculate_metrics(y_test, y_pred_presaved)
@@ -485,9 +471,13 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
 
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
+print_ln("Running training phase...")
 start_timer(1)
-#test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
+test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
+print_ln("Finished running training phase...")
+print_ln("Running test phase...")
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(2)
+print_ln("Finished running test phase...")
