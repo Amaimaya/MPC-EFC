@@ -2,8 +2,7 @@ import time
 import pandas as pd
 import numpy as np
 
-SIZE = "small"
-
+SIZE = "medium"
 print("Running test selectors...")
 
 X = pd.read_csv("../data/" + SIZE + "/test.csv")
@@ -46,13 +45,13 @@ def compute_selectors():
                         break
                     for m in range(len_coupling_matrix):
                         if l == (j * (max_bin - 1) + j_value) and m == (k * (max_bin - 1) + k_value) and is_k_value:
-                            matrix_selector2[l][m] = 1
+                            matrix_selector2[l][m] += 1
                             stop = True
                             break
 
             for k in range(len_local_fields):
                 if k == (j * (max_bin - 1) + j_value) and is_j_value:
-                    matrix_selector1[k] = 1
+                    matrix_selector1[k] += 1
                     break
 
         all_fields_selectors.append(matrix_selector1)

@@ -269,8 +269,7 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
                     k_value = X[i][k]
                     if k_value != (max_bin - 1): # Check if the attribute value is not the last bin
                         # The "−∑e" part of the equation
-                        e -= (coupling_matrix[j * (max_bin - 1)
-                                                    + j_value][k * (max_bin - 1) + k_value])
+                        e -= (coupling_matrix[j * (max_bin - 1) + j_value][k * (max_bin - 1) + k_value])
                 # The "−∑h" part of the equation
                 e -= (local_fields[j * (max_bin - 1) + j_value])
         energies[i] = e

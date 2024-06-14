@@ -286,7 +286,6 @@ def pair_freq(X_view, sitefreq_view, psdcounts, max_bin):
     pairfreq = multiply_4d_matrix_by_scalar(pairfreq, 1-psdcounts)
     pairfreq += sfix(psdcounts / (max_bin ** 2))
 
-
     @for_range_opt(n_attr)
     def _(i):
         @for_range_opt(max_bin)
@@ -369,13 +368,13 @@ def compute_energy(X, coupling_matrix, local_fields, max_bin):
                         condition1 = (l==(j * (max_bin - 1) + j_value)).if_else(1,0)
                         condition2 = (m==(k * (max_bin - 1) + k_value)).if_else(1,0)
                         condition3 = (is_k_value == 1).if_else(1,0)
-                        matrix_selector2[l][m] = ((condition1 + condition2 + condition3) == 3).if_else(1,matrix_selector2[l][m])
+                        matrix_selector2[l][m] = ((condition1 + condition2 + condition3) == 3).if_else(matrix_selector2[l][m] + 1,matrix_selector2[l][m])
 
             @for_range_opt(len(local_fields))
             def _(k):
                 condition1 = (k == (j * (max_bin - 1) + j_value)).if_else(1,0)
                 condition2 = (is_j_value == 1).if_else(1,0)
-                matrix_selector1[k] = (condition1 + condition2==2).if_else(1, matrix_selector1[k])
+                matrix_selector1[k] = (condition1 + condition2==2).if_else(matrix_selector1[k] + 1, matrix_selector1[k])
 
         energies[i] -= dot_product_matrix(coupling_matrix, matrix_selector2)
         energies[i] -= dot_product(local_fields, matrix_selector1)
@@ -424,8 +423,8 @@ def predict(X, coupling_matrix, localfields, cutoff, max_bin):
 
 
 def data_preprocessing():
-    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/small/train.csv")
-    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/small/test.csv")
+    X_train = pd.read_csv("Programs/Source/MPC-EFC/data/mediumbig/train.csv")
+    X_test = pd.read_csv("Programs/Source/MPC-EFC/data/mediumbig/test.csv")
 
     y_train = X_train["target"].values.tolist()
     y_test = X_test["target"].values.tolist()
@@ -487,7 +486,7 @@ def test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
 start_timer(1)
-test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
+#test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)

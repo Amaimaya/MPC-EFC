@@ -275,12 +275,14 @@ def compute_energy_train(X, coupling_matrix, local_fields, max_bin):
                 def _(l):
                     @for_range_opt(coupling_matrix_len)
                     def _(m):
-                        selector_coupling[l][m] = (((l-value_condition_1).square() + (m-value_condition_2).square() + (1-is_k_value).square()) == 0).if_else(1,selector_coupling[l][m])
+                        coupling_is_eq_idx1 = (l-value_condition_1).square()
+                        coupling_is_eq_idx2 = (l-value_condition_2).square()
+                        selector_coupling[l][m] = ((coupling_is_eq_idx1 + coupling_is_eq_idx2 + (1-is_k_value)) == 0).if_else(selector_coupling[l][m] + 1,selector_coupling[l][m])
 
             @for_range_opt(local_field_len)
             def _(k):
                 condition1 = ((k == (j * (max_bin - 1) + j_value))).if_else(1,0)
-                selector_fields[k] = (condition1 + is_j_value==2).if_else(1, selector_fields[k])
+                selector_fields[k] = (condition1 + is_j_value==2).if_else(selector_fields[k] + 1, selector_fields[k])
 
         energies[i] -= (dot_product_neg_matrix(coupling_matrix, selector_coupling) + sfix.dot_product(local_fields, selector_fields))
 
@@ -391,11 +393,11 @@ SIZE = "medium"
 
 X_train, X_test, y_train, y_test, local_fields_shape, coupling_matrix_shape, max_bin = data_preprocessing()
 
-'''print_ln("Running training phase...")
+print_ln("Running training phase...")
 start_timer(1)
 test_training_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
 stop_timer(1)
-print_ln("Finished running training phase...")'''
+print_ln("Finished running training phase...")
 print_ln("Running test phase...")
 start_timer(2)
 test_inference_phase(X_train, X_test, y_train, y_test, max_bin, local_fields_shape, coupling_matrix_shape)
