@@ -1,3 +1,8 @@
+# Overview
+- A privacy-preserving solution for the Energy-Based Flow Classifier (EFC), a machine learning algorithm for detecting network intrusions (https://github.com/EnergyBasedFlowClassifier/EFC-package). 
+- Privacy is ensured using secure multi-party computation (MPC) implemented with the MP-SPDZ framework, a modified version of SPDZ-2 (https://github.com/data61/MP-SPDZ).
+- Optimization techniques have been used to balance privacy and performance, resulting in a significantly more efficient algorithm compared to its naive version.
+
 # Running the code
 
 ## Setup
